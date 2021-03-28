@@ -44,5 +44,6 @@ __import__( "GafferImage" )
 
 from .Foo import Foo, FooDeformer
 from .NodeColors import *
+from .ContactSheet import *
 
 __import__( "IECore" ).loadConfig( "GAFFER_STARTUP_PATHS", subdirectory = "GafferScene" )

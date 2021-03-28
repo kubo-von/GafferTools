@@ -8,5 +8,7 @@ import imath
 nodeMenu = GafferUI.NodeMenu.acquire( application )
 nodeMenu.append( "/Tools/Foo", GafferTools.Foo, searchText = "Foo" )
 nodeMenu.append( "/Tools/FooDeformer", GafferTools.Foo, searchText = "FooDeformer" )
+nodeMenu.append( "/Tools/ContactSheet", GafferTools.ContactSheet, searchText = "ContactSheet" )
+
 mainMenuDefinition = GafferUI.ScriptWindow.menuDefinition( application )
-mainMenuDefinition.append( "/MyTools/Node Colors", { "command" : GafferTools.ShowNodeColorsWindow } )
+mainMenuDefinition.append( "/Tools/Node Colors", { "command" : GafferTools.ShowNodeColorsWindow } )
