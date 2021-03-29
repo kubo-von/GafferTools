@@ -7,63 +7,66 @@ import math
 
 class ContactSheet( GafferImage.ImageProcessor ) :
 
-    def __init__(self, name = 'ContactSheet' ) :
-
+    def __init__(self, name = 'ContactSheet' ):
         GafferImage.ImageProcessor.__init__( self, name )
 
-        
-
-        self.inPlugs = []
         self.internalNetwork = []
         self.uiPlugs = []
         
         self["in"] = Gaffer.ArrayPlug( "in", Gaffer.Plug.Direction.In, element = GafferImage.ImagePlug( flags = Gaffer.Plug.Flags.Default | Gaffer.Plug.Flags.Dynamic) )
-        self["in"].childAddedSignal().connect( self.update, scoped = False )
-        self["in"].childRemovedSignal().connect( self.update, scoped = False )
-        self.plugDirtiedSignal().connect( self.plugDirtied, scoped = False )
 
-        self.addChild( Gaffer.IntPlug( "Columns" ) )
-        self["Columns"].setValue( 2 )
-        self.uiPlugs.append(self["Columns"])
-        self.addChild( Gaffer.IntPlug( "SpacingPixels" ) )
-        self["SpacingPixels"].setValue( 0 )
-        self.uiPlugs.append(self["SpacingPixels"])
+        self.addChild( Gaffer.IntPlug( "Columns", defaultValue = 2 ) )
+        self.addChild( Gaffer.IntPlug( "SpacingPixels", defaultValue = 0 ) )
         self.addChild( Gaffer.Color4fPlug( "BackgroundColor" ) )
-        self.addChild( Gaffer.BoolPlug( "FillAlpha" ) )
-        self["FillAlpha"].setValue( True )
-        self.uiPlugs.append(self["FillAlpha"])
+        self.addChild( Gaffer.BoolPlug( "FillAlpha", defaultValue = True ) )
+        self.uiPlugs.extend( (self["Columns"], self["SpacingPixels"], self["FillAlpha"]) )
 
-        self["__BG"] = GafferImage.Constant()
-        self.internalNetwork.append(self["__BG"])
-        self['out'].setFlags(Gaffer.Plug.Flags.Serialisable, False)
-        self['out'].setInput( self['__BG']['out'] )
+        if (len(self["in"])==1):
+            self.addChild(GafferImage.Constant("__BG"))
+            self.internalNetwork.append(self["__BG"])
 
-        self.generateInternalNetwork()
+            self['out'].setFlags(Gaffer.Plug.Flags.Serialisable, False)
+            self['out'].setInput( self['__BG']['out'] )
+        else:
+            self.generateInternalNetwork()
 
-    def update(self,plug,subplug):
-        self.generateInternalNetwork()
+        self.plugSetSignal().connect(  Gaffer.WeakMethod(self.update), scoped = False )
+        self["in"].childAddedSignal().connect(  Gaffer.WeakMethod(self.update), scoped = False )
+        self["in"].childRemovedSignal().connect(  Gaffer.WeakMethod(self.update), scoped = False )
+        
 
-    def plugDirtied( self, plug) :
-        if plug in self.uiPlugs:
+    def update(self,plug,subplug=None):
+        #print(plug, subplug)
+        if (plug in self.uiPlugs):
+            #print(plug)
+            self.generateInternalNetwork()
+        if (plug == self["in"]):
+            #print(plug)
+            self.generateInternalNetwork()
+        if (subplug in self["in"].children()):
+            #print(subplug)
             self.generateInternalNetwork()
 
     def generateInternalNetwork(self):
-        imageSize = imath.V2f( 256, 256.0 )
+        imageSize = imath.V2i( 256, 256 )
         columns = self["Columns"].getValue()
         spacingPixels = self["SpacingPixels"].getValue()
         fillAlpha = self["FillAlpha"].getValue()
 
-        if (self["in"][0].getInput() != None):
+        if (self["in"][1].getInput() != None):
             imageSize = self["in"][0].dataWindow().size()
+            print(self["in"][0].dataWindow().size())
         
         #delete everything inside
         for i in self.internalNetwork:
-            self.removeChild(i)
-        self.internalNetwork = []
+            if i in self.children():
+                self.removeChild(i)
+                self.internalNetwork.remove(i)
         
         self["__BG"] = GafferImage.Constant()
         self["__BG"]["color"].setInput( self["BackgroundColor"] )
         self["__BG"]["format"].setValue( GafferImage.Format( int(imageSize.x+spacingPixels)*columns +spacingPixels, int( math.ceil((len(self["in"])-1)/columns) ) * int(imageSize.y+spacingPixels) +spacingPixels ) )
+        self.internalNetwork.append(self["__BG"])
 
         prevNode = self["__BG"]
         #construct the node chain
@@ -99,13 +102,12 @@ class ContactSheet( GafferImage.ImageProcessor ) :
                 mergeNode['in']['in0'].setInput( prevNode['out'] )
                 mergeNode['in']['in1'].setInput(shuffle['out'])
                 mergeNode["operation"].setValue( 8 )
-                
 
                 prevNode = mergeNode
-                self.internalNetwork.append(mergeNode)
-                self.internalNetwork.append(xform)
+                self.internalNetwork.extend( (mergeNode, xform, shuffle) )
 
         self['out'].setFlags(Gaffer.Plug.Flags.Serialisable, False)
         self['out'].setInput( prevNode['out'] )
+
 
 IECore.registerRunTimeTyped( ContactSheet, typeName = "GafferImage::ContactSheet" )
