@@ -21,6 +21,7 @@ class ContactSheet( GafferImage.ImageProcessor ) :
         self.addChild( Gaffer.BoolPlug( "FillAlpha", defaultValue = True ) )
         self.uiPlugs.extend( (self["Columns"], self["SpacingPixels"], self["FillAlpha"]) )
 
+        #If nothing is plugged create constant to avoid errors
         if (len(self["in"])==1):
             self.addChild(GafferImage.Constant("__BG"))
             self.internalNetwork.append(self["__BG"])
@@ -31,20 +32,14 @@ class ContactSheet( GafferImage.ImageProcessor ) :
             self.generateInternalNetwork()
 
         self.plugSetSignal().connect(  Gaffer.WeakMethod(self.update), scoped = False )
-        self["in"].childAddedSignal().connect(  Gaffer.WeakMethod(self.update), scoped = False )
-        self["in"].childRemovedSignal().connect(  Gaffer.WeakMethod(self.update), scoped = False )
-        
+        self.plugInputChangedSignal().connect(  Gaffer.WeakMethod(self.update), scoped = False )
 
     def update(self,plug,subplug=None):
-        #print(plug, subplug)
         if (plug in self.uiPlugs):
-            #print(plug)
             self.generateInternalNetwork()
         if (plug == self["in"]):
-            #print(plug)
             self.generateInternalNetwork()
-        if (subplug in self["in"].children()):
-            #print(subplug)
+        if (subplug in self["in"].children() or plug in self["in"].children() ):
             self.generateInternalNetwork()
 
     def generateInternalNetwork(self):
@@ -55,14 +50,13 @@ class ContactSheet( GafferImage.ImageProcessor ) :
 
         if (self["in"][1].getInput() != None):
             imageSize = self["in"][0].dataWindow().size()
-            print(self["in"][0].dataWindow().size())
         
         #delete everything inside
         for i in self.internalNetwork:
             if i in self.children():
                 self.removeChild(i)
                 self.internalNetwork.remove(i)
-        
+
         self["__BG"] = GafferImage.Constant()
         self["__BG"]["color"].setInput( self["BackgroundColor"] )
         self["__BG"]["format"].setValue( GafferImage.Format( int(imageSize.x+spacingPixels)*columns +spacingPixels, int( math.ceil((len(self["in"])-1)/columns) ) * int(imageSize.y+spacingPixels) +spacingPixels ) )
@@ -77,7 +71,6 @@ class ContactSheet( GafferImage.ImageProcessor ) :
                 xform['in'].setInput( self["in"][pi] )
                 row = math.ceil( (len(self["in"])-1) / columns)- math.floor( pi / columns ) -1
                 col = ((pi)%columns)
-                #print(row,col)
                 xform["transform"]["translate"].setValue( imath.V2f( col*(imageSize.x+float(spacingPixels)) +float(spacingPixels), row*(imageSize.y+float(spacingPixels)) +float(spacingPixels) ) )
 
                 self["__shuffle"+str(pi)] = GafferImage.Shuffle()
@@ -108,6 +101,5 @@ class ContactSheet( GafferImage.ImageProcessor ) :
 
         self['out'].setFlags(Gaffer.Plug.Flags.Serialisable, False)
         self['out'].setInput( prevNode['out'] )
-
 
 IECore.registerRunTimeTyped( ContactSheet, typeName = "GafferImage::ContactSheet" )
